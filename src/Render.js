@@ -11,6 +11,14 @@ class Point {
         this.str = this.str.bind(this);
     }
 
+    x() {
+        return this.x;
+    }
+
+    y() {
+        return this.y;
+    }
+
     times(value) {
         let x = this.x * value;
         let y = this.y * value;
@@ -50,6 +58,7 @@ export default class Render extends Component {
         this.addPoint            = this.addPoint.bind(this);
         this.factoryCircle       = this.factoryCircle.bind(this);
         this.drawPath            = this.drawPath.bind(this);
+        this.drawGuideLines      = this.drawGuideLines.bind(this);
         this.drawLinearBezier    = this.drawLinearBezier.bind(this);
         this.drawQuadraticBezier = this.drawQuadraticBezier.bind(this);
         this.drawCubicBezier     = this.drawCubicBezier.bind(this);
@@ -93,7 +102,6 @@ export default class Render extends Component {
     }
 
     addPoint(mouseEvent) {
-
         const maxPoints = this.numPointByMethod[this.state.method];
         if (Object.values(this.points).length >= maxPoints) return;
 
@@ -138,11 +146,42 @@ export default class Render extends Component {
         this.svg.appendChild(path);
     }
 
+    drawGuideLines(lines) {
+        const [p0, p1, p2] = lines;
+
+        if (Render.lastGuideLine == null)
+            Render.lastGuideLine = [];
+
+        if (p0 != null && p1 != null) {
+            let line_1 = this.factoryElement("line");
+            line_1.setAttributeNS(null, "x1", p0.x);
+            line_1.setAttributeNS(null, "y1", p0.y);
+            line_1.setAttributeNS(null, "x2", p1.x);
+            line_1.setAttributeNS(null, "y2", p1.y);
+            line_1.setAttributeNS(null, "stroke", "black");
+
+            Render.lastGuideLine.push(line_1);
+            this.svg.appendChild(line_1);
+        }
+
+        if (p1 != null && p2 != null) {
+            let line_2 = this.factoryElement("line");
+            line_2.setAttributeNS(null, "x1", p1.x);
+            line_2.setAttributeNS(null, "y1", p1.y);
+            line_2.setAttributeNS(null, "x2", p2.x);
+            line_2.setAttributeNS(null, "y2", p2.y);
+            line_2.setAttributeNS(null, "stroke", "black");
+
+            Render.lastGuideLine.push(line_2);
+            this.svg.appendChild(line_2);
+        }
+    }
+
     drawLinearBezier() {
         let [p0, p1] = Object.values(this.points);
 
         let points = [];
-        for (let t = 0; t < 1; t += 0.1) {
+       for (let t = 0; t < 1; t += 0.05) {
             let point = p0.times(1-t).sum(p1.times(t));
             points.push(point);
         }
@@ -154,6 +193,7 @@ export default class Render extends Component {
         let [p0, p1, p2] = Object.values(this.points);
 
         let points = [];
+        let guide_line;
 
         for (let t = 0; t < 1; t += 0.1) {
             let p0_p1 = p0.sub(p1);
@@ -162,6 +202,8 @@ export default class Render extends Component {
                 .sum(p0_p1.times((1-t)*(1-t)))
                 .sum(p2_p1.times(t*t));
 
+            guide_line = [p0.sum(p1.sub(p0).times(t)), p1.sum(p2.sub(p1).times(t))];
+            this.drawGuideLines(guide_line);
             points.push(point);
         }
 
@@ -173,6 +215,7 @@ export default class Render extends Component {
 
         const pow = (x, n) => Math.pow(x, n);
         let points = [];
+        let guide_lines;
 
         for (let t = 0; t < 1; t += 0.1) {
             let point = p0.times(pow(1-t, 3))
@@ -180,6 +223,12 @@ export default class Render extends Component {
                 .sum(p2.times(3*(1-t)*pow(t, 2)))
                 .sum(p3.times(pow(t, 3)));
 
+            guide_lines = [
+                p0.sum(p1.sub(p0).times(t)),
+                p1.sum(p2.sub(p1).times(t)),
+                p2.sum(p3.sub(p2).times(t))];
+
+            this.drawGuideLines(guide_lines);
             points.push(point);
         }
 
@@ -196,6 +245,13 @@ export default class Render extends Component {
     removeLastPathDrawn() {
         if (Render.lastPathDrawn)
             this.svg.removeChild(Render.lastPathDrawn);
+
+        if (Render.lastGuideLine != null) {
+            for (const line of Render.lastGuideLine)
+                this.svg.removeChild(line);
+
+            Render.lastGuideLine = null;
+        }
     }
 
     draw() {
